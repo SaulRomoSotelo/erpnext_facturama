@@ -74,6 +74,62 @@ frappe.ui.form.on("Sales Invoice", {
 						});
 					}
 				},
+				error(r) {
+					frappe.msgprint({
+						title: "Error de conexión",
+						message: r.exception || r.message || "No se pudo conectar con el servidor.",
+						indicator: "red",
+					});
+				},
+			});
+		}, "Factura Electrónica");
+
+		frm.add_custom_button("Verificar Estatus", () => {
+			frappe.call({
+				method: "erpnext_facturama.facturacionorcom.doctype.facturama_settings.facturama_settings.check_cfdi_status",
+				args: { sales_invoice: frm.doc.name },
+				freeze: true,
+				freeze_message: "Consultando estatus del CFDI en Facturama...",
+				callback(response) {
+					const result = response.message || {};
+					if (!result.ok) {
+						frappe.msgprint({
+							title: "Error",
+							message: result.error || "No se pudo consultar el estatus.",
+							indicator: "orange",
+						});
+						return;
+					}
+
+					const statusMap = {
+						active: { text: "Activo", indicator: "green" },
+						cancelled: { text: "Cancelado", indicator: "red" },
+						unknown: { text: "Desconocido", indicator: "orange" },
+					};
+					const statusInfo = statusMap[result.status] || { text: result.status, indicator: "orange" };
+
+					const lines = [
+						`<b>Estatus:</b> ${frappe.utils.escape_html(statusInfo.text)}`,
+						`<b>UUID:</b> ${frappe.utils.escape_html(result.uuid || "N/D")}`,
+						`<b>Folio:</b> ${frappe.utils.escape_html(result.cfdi_id || "N/D")}`,
+						`<b>Fecha:</b> ${frappe.utils.escape_html(result.date || "N/D")}`,
+						`<b>Total:</b> ${frappe.utils.escape_html(result.total || 0)} ${frappe.utils.escape_html(result.currency || "")}`,
+						`<b>Receptor:</b> ${frappe.utils.escape_html(result.receiver_name || "")} (${frappe.utils.escape_html(result.receiver_rfc || "")})`,
+					];
+
+					frappe.msgprint({
+						title: "Estatus del CFDI",
+						message: lines.join("<br>"),
+						indicator: statusInfo.indicator,
+					});
+				},
+				error(r) {
+					frappe.msgprint({
+						title: "Error de conexión",
+						message: r.exception || r.message || "No se pudo conectar con el servidor.",
+						indicator: "red",
+					});
+				},
 			});
 		}, "Factura Electrónica");
 

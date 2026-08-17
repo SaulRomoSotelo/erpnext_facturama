@@ -425,3 +425,38 @@ def validate_sales_invoice_for_facturama(sales_invoice):
 		"warnings": warnings,
 		"invoice": invoice.name,
 	}
+
+
+@frappe.whitelist()
+def check_cfdi_status(sales_invoice):
+	"""Check the current status of a CFDI in Facturama."""
+	invoice = frappe.get_doc("Sales Invoice", sales_invoice)
+	cfdi_id = getattr(invoice, "facturama_cfdi_id", None) or getattr(invoice, "cfdi_id", None)
+	if not cfdi_id:
+		return {
+			"ok": False,
+			"error": "La factura no tiene un identificador de CFDI/Timbrado asociado.",
+		}
+
+	client = get_facturama_client()
+	try:
+		result = client.request("GET", "/api-lite/cfdis/" + cfdi_id)
+	except Exception as exc:
+		frappe.log_error(frappe.get_traceback(), "Facturama status check")
+		return {"ok": False, "error": str(exc)}
+
+	status = result.get("Status", "unknown")
+	return {
+		"ok": True,
+		"cfdi_id": cfdi_id,
+		"status": status,
+		"uuid": ((result.get("Complement", {}) or {}).get("TaxStamp", {}) or {}).get("Uuid", ""),
+		"date": result.get("Date", ""),
+		"total": result.get("Total", 0),
+		"currency": result.get("Currency", ""),
+		"issuer_rfc": (result.get("Issuer", {}) or {}).get("Rfc", ""),
+		"receiver_rfc": (result.get("Receiver", {}) or {}).get("Rfc", ""),
+		"receiver_name": (result.get("Receiver", {}) or {}).get("Name", ""),
+		"full_response": result,
+	}
+
