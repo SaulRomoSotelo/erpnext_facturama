@@ -193,9 +193,9 @@ class FacturamaClient:
             raise ValueError("La URL de Facturama no está configurada")
 
         candidates = [
+            f"/cfdi/xml/issuedLite/{cfdi_id}",
+            f"/api-lite/4/cfdis/xml/{cfdi_id}",
             f"/api-lite/cfdis/{cfdi_id}/xml",
-            f"/api-lite/3/cfdis/{cfdi_id}/xml",
-            f"/cfdi/{cfdi_id}/xml",
         ]
 
         last_error = ""
@@ -223,6 +223,13 @@ class FacturamaClient:
                 payload = response.json() if response.content else {}
             except ValueError:
                 payload = body_text
+
+            if isinstance(payload, dict):
+                for key in ("Content", "content", "Xml", "xml"):
+                    if payload.get(key):
+                        xml = _extract_xml_text(payload[key])
+                        if xml:
+                            return xml
 
             xml = _extract_xml_text(payload)
             if xml:
