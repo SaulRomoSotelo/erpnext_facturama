@@ -1,0 +1,15 @@
+{
+ "creation": "2026-08-09 00:00:00.000000",
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-08-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Facturacionorcom",
+ "name": "vista-almacen",
+ "owner": "Administrator",
+ "page_name": "vista-almacen",
+ "restrict_to_domain": "",
+ "roles": [],
+ "system_page": 0,
+ "title": "Vista Almacén"
+}

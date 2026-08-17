@@ -1,0 +1,116 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:company",
+ "creation": "2026-08-07 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company_section",
+  "company",
+  "rfc",
+  "fiscal_regime",
+  "expedition_place",
+  "active",
+  "csd_section",
+  "certificate_file",
+  "private_key_file",
+  "private_key_password",
+  "csd_status",
+  "csd_uploaded_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "company_section",
+   "fieldtype": "Section Break",
+   "label": "Emisor"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "company.tax_id",
+   "fieldname": "rfc",
+   "fieldtype": "Data",
+   "label": "RFC",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "company.mx_tax_regime",
+   "fieldname": "fiscal_regime",
+   "fieldtype": "Data",
+   "label": "Régimen fiscal",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "expedition_place",
+   "fieldtype": "Data",
+   "label": "Código postal de expedición",
+   "reqd": 1
+  },
+  {
+   "default": 1,
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Activo"
+  },
+  {
+   "fieldname": "csd_section",
+   "fieldtype": "Section Break",
+   "label": "Certificado de Sello Digital"
+  },
+  {
+   "fieldname": "certificate_file",
+   "fieldtype": "Attach",
+   "label": "Certificado (.cer)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "private_key_file",
+   "fieldtype": "Attach",
+   "label": "Llave privada (.key)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "private_key_password",
+   "fieldtype": "Password",
+   "label": "Contraseña de la llave",
+   "reqd": 1
+  },
+  {
+   "default": "No cargado",
+   "fieldname": "csd_status",
+   "fieldtype": "Select",
+   "label": "Estado del CSD",
+   "options": "No cargado\nCargado\nError",
+   "read_only": 1
+  },
+  {
+   "fieldname": "csd_uploaded_at",
+   "fieldtype": "Datetime",
+   "label": "Última carga del CSD",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "module": "FacturacionORCom",
+ "name": "Facturama Emisor",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

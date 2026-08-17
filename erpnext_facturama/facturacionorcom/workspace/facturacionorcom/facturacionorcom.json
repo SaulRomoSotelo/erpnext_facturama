@@ -1,0 +1,38 @@
+{
+ "app": "erpnext_facturama",
+ "charts": [],
+ "content": "[{\"id\":\"factura-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>FacturacionORCom</b></span>\",\"col\":12}},{\"id\":\"factura-shortcut\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Vista Almac\\u00e9n\",\"col\":4}}]",
+ "creation": "2026-08-09 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "list",
+ "idx": 0,
+ "indicator_color": "blue",
+ "is_hidden": 0,
+ "label": "FacturacionORCom",
+ "links": [],
+ "modified": "2026-08-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "FacturacionORCom",
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 1,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "doc_view": "",
+   "icon": "list",
+   "idx": 1,
+   "label": "Vista Almac\u00e9n",
+   "link_to": "vista-almacen",
+   "type": "Page"
+  }
+ ],
+ "title": "FacturacionORCom"
+}
