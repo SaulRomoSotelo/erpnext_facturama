@@ -50,6 +50,8 @@ app_license = "mit"
 
 doctype_js = {
 	"Sales Invoice": "public/js/sales_invoice_facturama.js",
+	"Quotation": "public/js/sales_invoice_facturama.js",
+	"Remision": "facturacionorcom/doctype/remision/remision.js",
 }
 
 # Svg Icons
@@ -254,6 +256,11 @@ doctype_js = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
+
+
+pdf_body_html = [
+	"erpnext_facturama.pdf_hook.inject_cfdi_seals"
+]
 
 # Translation
 # ------------

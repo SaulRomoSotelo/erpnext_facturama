@@ -30,7 +30,7 @@ ARROSA_QUOTATION_HTML = """
     <div><span class="k">Procedimiento:</span> {{ doc.customer_procedimiento or "" }}</div>
   </div>
 
-  <div class="title">COTIZACION {{ (doc.customer_hospital or "").upper() }}</div>
+  <div class="title">COTIZACION</div>
 
   <table class="items">
     <thead>
@@ -244,6 +244,45 @@ ARROSA_SALES_ORDER_HTML = """
 
 ARROSA_SALES_ORDER_CSS = ARROSA_QUOTATION_CSS
 
+
+
+@frappe.whitelist(allow_guest=True)
+def get_cfdi_seals(doc):
+    """Extract CFDI seal data from stamped XML."""
+    import base64
+    import xml.etree.ElementTree as ET
+    result = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": ""}
+    if not doc.mx_stamped_xml:
+        return result
+    try:
+        xml_str = base64.b64decode(doc.mx_stamped_xml).decode("utf-8")
+    except Exception:
+        try:
+            xml_str = doc.mx_stamped_xml
+        except Exception:
+            return result
+    try:
+        root = ET.fromstring(xml_str)
+    except Exception:
+        return result
+    result["sello_emisor"] = root.get("Sello", "")
+    result["no_cert_emisor"] = root.get("NoCertificado", "")
+    ns_tfd = "http://www.sat.gob.mx/TimbreFiscalDigital"
+    for elem in root.iter("{" + ns_tfd + "}TimbreFiscalDigital"):
+        result["no_cert_sat"] = elem.get("NoCertificadoSAT", "")
+        result["sello_sat"] = elem.get("SelloSAT", "")
+        result["uuid"] = elem.get("UUID", "")
+    # Build QR URL
+    company = frappe.get_doc("Company", doc.company) if doc.company else None
+    customer = frappe.get_doc("Customer", doc.customer) if doc.customer else None
+    rfc_emisor = company.tax_id if company else ""
+    rfc_receptor = customer.tax_id if customer else ""
+    total_str = str(doc.grand_total)
+    sello_last8 = result["sello_emisor"][-8:] if result["sello_emisor"] else ""
+    uuid_val = result["uuid"] or doc.mx_uuid or ""
+    result["qr_url"] = f"https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx?id={uuid_val}&re={rfc_emisor}&rr={rfc_receptor}&tt={total_str}&fe={sello_last8}"
+    return result
+
 ARROSA_SALES_INVOICE_HTML = """
 {% set company = frappe.get_doc("Company", doc.company) if doc.company else None %}
 {% set logo_url = frappe.utils.get_url(company.company_logo) if company and company.company_logo else "" %}
@@ -344,10 +383,39 @@ ARROSA_SALES_INVOICE_HTML = """
     </table>
   </div>
 
+  {% set seals = frappe.call("erpnext_facturama.facturacionorcom.utils.print_formats.get_cfdi_seals", doc=doc) %}
+
   {% if invoice_uuid %}
-  <div class="seal-block">
-    <div><span class="k">UUID:</span> {{ invoice_uuid }}</div>
-    <div><span class="k">Estado CFDI:</span> {{ doc.mx_cfdi_status or "" }}</div>
+  <div class="seal-section">
+    <div class="seal-title">Sellos Digitales</div>
+
+    <div class="seal-row">
+      <span class="k">Sello Digital del Emisor:</span>
+      <div class="seal-text">{{ seals.sello_emisor }}</div>
+    </div>
+
+    <div class="seal-row">
+      <span class="k">No. Certificado del Emisor:</span> {{ seals.no_cert_emisor }}
+    </div>
+
+    <div class="seal-row">
+      <span class="k">Sello del SAT:</span>
+      <div class="seal-text">{{ seals.sello_sat }}</div>
+    </div>
+
+    <div class="seal-row">
+      <span class="k">No. Certificado SAT:</span> {{ seals.no_cert_sat }}
+    </div>
+
+    <div class="seal-row">
+      <span class="k">UUID:</span> {{ invoice_uuid }}
+    </div>
+
+    {% if seals.qr_url %}
+    <div class="qr-section">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ seals.qr_url }}" alt="CFDI QR" />
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -448,6 +516,36 @@ ARROSA_SALES_INVOICE_CSS = """
   text-align: center;
   font-size: 10px;
   font-weight: 700;
+}
+.arrosa-invoice .seal-section {
+  margin-top: 18px;
+  border-top: 2px solid #333;
+  padding-top: 10px;
+}
+.arrosa-invoice .seal-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.arrosa-invoice .seal-row {
+  margin: 4px 0;
+  font-size: 9px;
+  word-break: break-all;
+}
+.arrosa-invoice .seal-text {
+  font-family: monospace;
+  font-size: 8px;
+  line-height: 1.3;
+  background: #f8f8f8;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  max-height: 60px;
+  overflow: hidden;
+}
+.arrosa-invoice .qr-section {
+  text-align: center;
+  margin-top: 12px;
 }
 """.strip()
 

@@ -1,0 +1,286 @@
+{
+  "actions": [],
+  "creation": "2026-08-18 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "naming_series",
+    "status",
+    "company",
+    "column_break_1",
+    "transaction_date",
+    "customer",
+    "customer_name",
+    "section_break_medico",
+    "tecnico",
+    "hospital",
+    "cirujano",
+    "paciente",
+    "column_break_medico",
+    "hora",
+    "edad",
+    "procedimiento",
+    "section_break_almacen",
+    "warehouse",
+    "column_break_2",
+    "items_section",
+    "item_group",
+    "items",
+    "section_break_totales",
+    "total_qty",
+    "column_break_3",
+    "base_total",
+    "total",
+    "section_break_notes",
+    "notes",
+    "amended_from"
+  ],
+  "fields": [
+    {
+      "fieldname": "naming_series",
+      "fieldtype": "Select",
+      "label": "Serie",
+      "options": "REM-.YYYY.-",
+      "reqd": 1,
+      "set_only_once": 1
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "Estado",
+      "options": "Draft\nSent\nCancelled",
+      "default": "Draft",
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Empresa",
+      "options": "Company",
+      "reqd": 1,
+      "set_only_once": 1,
+      "default": "__user"
+    },
+    {
+      "fieldname": "column_break_1",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "transaction_date",
+      "fieldtype": "Date",
+      "label": "Fecha",
+      "reqd": 1,
+      "default": "Today"
+    },
+    {
+      "fieldname": "customer",
+      "fieldtype": "Link",
+      "label": "Cliente",
+      "options": "Customer",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "customer_name",
+      "fieldtype": "Data",
+      "label": "Nombre Cliente",
+      "read_only": 1
+    },
+    {
+      "fieldname": "section_break_medico",
+      "fieldtype": "Section Break",
+      "label": "Datos Medicos"
+    },
+    {
+      "fieldname": "tecnico",
+      "fieldtype": "Data",
+      "label": "Tecnico",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "hospital",
+      "fieldtype": "Data",
+      "label": "Hospital"
+    },
+    {
+      "fieldname": "cirujano",
+      "fieldtype": "Data",
+      "label": "Cirujano"
+    },
+    {
+      "fieldname": "paciente",
+      "fieldtype": "Data",
+      "label": "Paciente"
+    },
+    {
+      "fieldname": "column_break_medico",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "hora",
+      "fieldtype": "Time",
+      "label": "Hora"
+    },
+    {
+      "fieldname": "edad",
+      "fieldtype": "Data",
+      "label": "Edad"
+    },
+    {
+      "fieldname": "procedimiento",
+      "fieldtype": "Data",
+      "label": "Procedimiento"
+    },
+    {
+      "fieldname": "section_break_almacen",
+      "fieldtype": "Section Break",
+      "label": "Almacen"
+    },
+    {
+      "fieldname": "warehouse",
+      "fieldtype": "Link",
+      "label": "Almacen",
+      "options": "Warehouse",
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_2",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "items_section",
+      "fieldtype": "Section Break",
+      "label": "Grupo de Productos"
+    },
+    {
+      "fieldname": "item_group",
+      "fieldtype": "Link",
+      "label": "Grupo de Productos",
+      "options": "Item Group",
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "items",
+      "fieldtype": "Table",
+      "label": "Items del Grupo",
+      "options": "Remision Item",
+      "reqd": 0
+    },
+    {
+      "fieldname": "section_break_totales",
+      "fieldtype": "Section Break",
+      "label": "Totales"
+    },
+    {
+      "fieldname": "total_qty",
+      "fieldtype": "Float",
+      "label": "Cantidad Total",
+      "read_only": 1
+    },
+    {
+      "fieldname": "column_break_3",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "base_total",
+      "fieldtype": "Currency",
+      "label": "Total (Moneda Empresa)",
+      "read_only": 1,
+      "options": "company:default_currency"
+    },
+    {
+      "fieldname": "total",
+      "fieldtype": "Currency",
+      "label": "Total",
+      "read_only": 1,
+      "options": "currency"
+    },
+    {
+      "fieldname": "section_break_notes",
+      "fieldtype": "Section Break",
+      "label": "Notas"
+    },
+    {
+      "fieldname": "notes",
+      "fieldtype": "Text Editor",
+      "label": "Notas"
+    },
+    {
+      "fieldname": "amended_from",
+      "fieldtype": "Link",
+      "label": "Amended From",
+      "options": "Remision",
+      "read_only": 1,
+      "no_copy": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "is_submittable": 1,
+  "links": [],
+  "modified": "2026-08-18 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "FacturacionORCom",
+  "name": "Remision",
+  "naming_rule": "By fieldname",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "submit": 1,
+      "cancel": 1,
+      "amend": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    },
+    {
+      "role": "Sales Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "submit": 1,
+      "cancel": 1,
+      "amend": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    },
+    {
+      "role": "Sales User",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "submit": 1,
+      "print": 1
+    }
+  ],
+  "search_fields": "customer_name,tecnico,hospital,patient_name",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [
+    {
+      "color": "gray",
+      "title": "Draft"
+    },
+    {
+      "color": "green",
+      "title": "Sent"
+    },
+    {
+      "color": "red",
+      "title": "Cancelled"
+    }
+  ],
+  "title_field": "customer_name",
+  "track_changes": 1,
+  "autoname": "naming_series:"
+}
