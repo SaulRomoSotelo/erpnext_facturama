@@ -353,7 +353,7 @@ ARROSA_SALES_INVOICE_HTML = """
     <tbody>
       {% for row in doc.items %}
       {% set item_doc = frappe.get_cached_doc("Item", row.item_code) if row.item_code else None %}
-      {% set sat_product = (item_doc.sat_product_key if item_doc and item_doc.sat_product_key else (item_doc.sat_item_key if item_doc and item_doc.sat_item_key else (item_doc.sat_clave_producto if item_doc and item_doc.sat_clave_producto else "01010101"))) %}
+      {% set sat_product = (item_doc.mx_product_service_key if item_doc and item_doc.mx_product_service_key else (item_doc.sat_product_key if item_doc and item_doc.sat_product_key else (item_doc.sat_item_key if item_doc and item_doc.sat_item_key else (item_doc.sat_clave_producto if item_doc and item_doc.sat_clave_producto else "01010101")))) %}
       {% set sat_unit = (item_doc.sat_uom if item_doc and item_doc.sat_uom else (item_doc.sat_unit_code if item_doc and item_doc.sat_unit_code else (item_doc.sat_clave_unidad if item_doc and item_doc.sat_clave_unidad else "E48"))) %}
       <tr>
         <td>{{ sat_product }}</td>
