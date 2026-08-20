@@ -460,3 +460,244 @@ def check_cfdi_status(sales_invoice):
 		"full_response": result,
 	}
 
+
+def _ensure_payment_entry_facturama_fields():
+	"""Ensure custom fields used to track the payment complement on Payment Entry."""
+	fields = [
+		{
+			"fieldname": "facturama_complement_cfdi_id",
+			"label": "Facturama Complemento de Pago CFDI ID",
+			"fieldtype": "Data",
+			"insert_after": "mode_of_payment",
+			"hidden": 1,
+			"translatable": 0,
+		},
+		{
+			"fieldname": "facturama_complement_uuid",
+			"label": "UUID Complemento de Pago",
+			"fieldtype": "Data",
+			"insert_after": "facturama_complement_cfdi_id",
+			"hidden": 1,
+			"translatable": 0,
+		},
+	]
+
+	for field in fields:
+		exists = frappe.db.exists(
+			"Custom Field", {"dt": "Payment Entry", "fieldname": field["fieldname"]}
+		)
+		if exists:
+			continue
+		frappe.get_doc({"doctype": "Custom Field", "dt": "Payment Entry", **field}).insert(
+			ignore_permissions=True
+		)
+
+
+@frappe.whitelist()
+def validate_payment_entry_for_complement(payment_entry):
+	"""Validate that a Payment Entry is suitable to stamp a payment complement."""
+	payment = frappe.get_doc("Payment Entry", payment_entry)
+	errors = []
+	warnings = []
+
+	if getattr(payment, "docstatus", 0) != 1:
+		errors.append("El Payment Entry debe estar contabilizado (Submited).")
+
+	if getattr(payment, "payment_type", "") != "Receive":
+		errors.append("El complemento de pago solo aplica a Payment Entries tipo Receive (cobros).")
+
+	if not getattr(payment, "party", None):
+		errors.append("El Payment Entry no tiene cliente.")
+
+	references = [r for r in getattr(payment, "references", []) or []]
+	invoice_refs = [
+		r
+		for r in references
+		if getattr(r, "reference_doctype", "") == "Sales Invoice"
+	]
+	if not invoice_refs:
+		errors.append("El Payment Entry no referencia ninguna factura de venta (Sales Invoice).")
+
+	settings = frappe.get_single("Facturama Settings")
+	if not getattr(settings, "api_user", None):
+		errors.append("Falta configurar el usuario API de Facturama.")
+	if not settings.get_password("api_password"):
+		errors.append("Falta guardar la contraseña API de Facturama.")
+
+	company = frappe.get_doc("Company", payment.company)
+	company_zip = _get_primary_company_pincode(payment.company)
+	if not company_zip or not str(company_zip).isdigit() or len(str(company_zip)) != 5:
+		errors.append("La empresa no tiene código postal válido de 5 dígitos para expedición.")
+
+	for ref in invoice_refs:
+		invoice_name = getattr(ref, "reference_name", None)
+		if not frappe.db.exists("Sales Invoice", invoice_name):
+			errors.append(f"La factura de referencia {invoice_name} no existe.")
+			continue
+		invoice = frappe.get_doc("Sales Invoice", invoice_name)
+		if getattr(invoice, "docstatus", 0) != 1:
+			errors.append(f"La factura {invoice_name} no está contabilizada.")
+		cfdi_id = getattr(invoice, "facturama_cfdi_id", None) or getattr(invoice, "cfdi_id", None)
+		if not cfdi_id:
+			errors.append(
+				f"La factura {invoice_name} no tiene un CFDI timbrado asociado (facturama_cfdi_id)."
+			)
+		if not getattr(ref, "allocated_amount", 0):
+			warnings.append(f"La factura {invoice_name} no tiene monto asignado (allocated_amount).")
+
+	return {
+		"ok": not errors,
+		"errors": errors,
+		"warnings": warnings,
+		"payment_entry": payment.name,
+	}
+
+
+@frappe.whitelist()
+def stamp_payment_complement(payment_entry):
+	"""Stamp a payment complement (CfdiType P) for a Receive Payment Entry."""
+	if not frappe.db.exists("Payment Entry", payment_entry):
+		return {
+			"ok": False,
+			"errors": ["Guarda el Payment Entry antes de timbrar el complemento."],
+			"warnings": [],
+		}
+
+	try:
+		_ensure_payment_entry_facturama_fields()
+		validation = validate_payment_entry_for_complement(payment_entry)
+		if not validation.get("ok"):
+			return {
+				"ok": False,
+				"errors": validation.get("errors", []),
+				"warnings": validation.get("warnings", []),
+				"message": "El Payment Entry no cumple con los requisitos para emitir el complemento.",
+			}
+
+		payment = frappe.get_doc("Payment Entry", payment_entry)
+
+		existing_cfdi = getattr(payment, "facturama_complement_cfdi_id", None)
+		if existing_cfdi:
+			return {
+				"ok": False,
+				"errors": [
+					f"Este Payment Entry ya tiene un complemento de pago timbrado (CFDI ID: {existing_cfdi})."
+				],
+				"warnings": [],
+			}
+
+		client = get_facturama_client()
+		payload = client.build_payment_complement_payload(
+			payment,
+			settings={
+				"default_payment_form": "03",
+				"zip_code_company": _get_primary_company_pincode(payment.company),
+			},
+		)
+
+		response = client.create_multiemisor_cfdi(payload)
+		cfdi_id = erpnext_facturama.facturacionorcom.api.facturama_client.extract_cfdi_id(response)
+		uuid = erpnext_facturama.facturacionorcom.api.facturama_client.extract_uuid(response)
+
+		if cfdi_id:
+			payment.db_set("facturama_complement_cfdi_id", cfdi_id)
+		if uuid:
+			payment.db_set("facturama_complement_uuid", uuid)
+		frappe.db.commit()
+
+		return {
+			"ok": True,
+			"message": "Complemento de pago timbrado correctamente.",
+			"response": response,
+			"cfdi_id": cfdi_id,
+			"uuid": uuid,
+		}
+	except Exception as exc:
+		frappe.log_error(frappe.get_traceback(), "Facturama payment complement stamping")
+		return {"ok": False, "error": str(exc)}
+
+
+@frappe.whitelist()
+def check_payment_complement_status(payment_entry):
+	"""Check the status of a stamped payment complement from a Payment Entry."""
+	payment = frappe.get_doc("Payment Entry", payment_entry)
+	cfdi_id = getattr(payment, "facturama_complement_cfdi_id", None)
+	if not cfdi_id:
+		return {
+			"ok": False,
+			"error": "El Payment Entry no tiene un complemento de pago timbrado asociado.",
+		}
+
+	client = get_facturama_client()
+	try:
+		result = client.get_cfdi_detail(cfdi_id)
+	except Exception as exc:
+		frappe.log_error(frappe.get_traceback(), "Facturama payment complement status")
+		return {"ok": False, "error": str(exc)}
+
+	return {
+		"ok": True,
+		"cfdi_id": cfdi_id,
+		"uuid": ((result.get("Complement", {}) or {}).get("TaxStamp", {}) or {}).get("Uuid", "")
+		or erpnext_facturama.facturacionorcom.api.facturama_client.extract_uuid(result),
+		"status": result.get("Status", "unknown"),
+		"date": result.get("Date", ""),
+		"total": result.get("Total", 0),
+		"currency": result.get("Currency", ""),
+		"receiver_rfc": (result.get("Receiver", {}) or {}).get("Rfc", ""),
+		"receiver_name": (result.get("Receiver", {}) or {}).get("Name", ""),
+		"full_response": result,
+	}
+
+
+@frappe.whitelist()
+def download_payment_complement_xml(payment_entry):
+	"""Download XML of a stamped payment complement from a Payment Entry."""
+	payment = frappe.get_doc("Payment Entry", payment_entry)
+	cfdi_id = getattr(payment, "facturama_complement_cfdi_id", None)
+	if not cfdi_id:
+		raise frappe.ValidationError(
+			"El Payment Entry no tiene un complemento de pago timbrado asociado."
+		)
+
+	client = get_facturama_client()
+	xml_text = client.download_multiemisor_cfdi_xml(cfdi_id)
+	filename = f"{payment.name}-{cfdi_id}.xml"
+
+	return {
+		"ok": True,
+		"filename": filename,
+		"cfdi_id": cfdi_id,
+		"xml_base64": base64.b64encode(xml_text.encode("utf-8")).decode("ascii"),
+	}
+
+
+@frappe.whitelist()
+def cancel_payment_complement(payment_entry, motive="02", uuid_replacement=None):
+	"""Request cancellation of a stamped payment complement from a Payment Entry."""
+	payment = frappe.get_doc("Payment Entry", payment_entry)
+	cfdi_id = getattr(payment, "facturama_complement_cfdi_id", None)
+	if not cfdi_id:
+		raise frappe.ValidationError(
+			"El Payment Entry no tiene un complemento de pago timbrado asociado."
+		)
+
+	client = get_facturama_client()
+	result = client.cancel_multiemisor_cfdi(
+		cfdi_id,
+		motive=motive,
+		uuid_replacement=uuid_replacement,
+	)
+
+	if result is not None:
+		payment.db_set("facturama_complement_cfdi_id", None)
+		payment.db_set("facturama_complement_uuid", None)
+		frappe.db.commit()
+
+	return {
+		"ok": True,
+		"result": result,
+		"payment_entry": payment.name,
+		"cfdi_id": cfdi_id,
+	}
+

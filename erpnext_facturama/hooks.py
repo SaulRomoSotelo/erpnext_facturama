@@ -52,6 +52,7 @@ doctype_js = {
 	"Sales Invoice": "public/js/sales_invoice_facturama.js",
 	"Quotation": "public/js/sales_invoice_facturama.js",
 	"Remision": "facturacionorcom/doctype/remision/remision.js",
+	"Payment Entry": "public/js/payment_entry_facturama.js",
 }
 
 # Svg Icons

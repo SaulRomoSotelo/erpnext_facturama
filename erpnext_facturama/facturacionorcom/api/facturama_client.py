@@ -58,6 +58,21 @@ def extract_cfdi_id(response):
     return None
 
 
+def extract_uuid(response):
+    """Extract the fiscal folio (UUID) from a Facturama CFDI detail response."""
+    if not isinstance(response, dict):
+        return ""
+
+    for key in ("Uuid", "UUID", "uuid"):
+        value = response.get(key)
+        if value:
+            return value
+
+    complement = response.get("Complement") or {}
+    tax_stamp = complement.get("TaxStamp") or {}
+    return tax_stamp.get("Uuid", "") or tax_stamp.get("UUID", "") or ""
+
+
 def _extract_xml_text(payload):
     if isinstance(payload, str):
         candidate = payload.strip()
@@ -174,6 +189,267 @@ class FacturamaClient:
     def create_multiemisor_cfdi(self, payload):
         """Create a CFDI through the Facturama multi-emisor endpoint."""
         return self.request("POST", "/api-lite/3/cfdis", json=payload)
+
+    def get_cfdi_detail(self, cfdi_id):
+        """Get the detail of an issued CFDI to read its UUID / serie / folio."""
+        return self.request("GET", "/api-lite/cfdis/" + cfdi_id)
+
+    def build_payment_complement_payload(self, payment_entry, settings=None):
+        """Build a Facturama 4.0 payment complement (CfdiType P) payload.
+
+        The payment complement references the CFDI UUIDs of the Sales Invoices
+        that were paid through the Payment Entry (references child table).
+        """
+        if settings is None:
+            settings = {}
+
+        if not payment_entry.references:
+            raise frappe.ValidationError(
+                "El Payment Entry no tiene documentos de referencia para emitir el complemento de pago."
+            )
+
+        paid_amount = float(getattr(payment_entry, "paid_amount", 0) or 0)
+        if paid_amount <= 0:
+            raise frappe.ValidationError("El monto pagado debe ser mayor a 0.")
+
+        customer = frappe.get_doc("Customer", payment_entry.party)
+        customer_zip = ""
+        if getattr(payment_entry, "party_address", None):
+            customer_zip = frappe.db.get_value(
+                "Address", payment_entry.party_address, "pincode"
+            ) or ""
+        if not customer_zip:
+            customer_zip = frappe.db.get_value(
+                "Address",
+                {"link_doctype": "Customer", "link_name": payment_entry.party},
+                "pincode",
+            ) or ""
+
+        customer_tax_regime = (
+            getattr(customer, "mx_tax_regime", None)
+            or getattr(customer, "sat_tax_regime", None)
+            or ""
+        )
+        customer_rfc = getattr(customer, "tax_id", None) or ""
+        customer_name = getattr(customer, "customer_name", None) or ""
+
+        if not customer_rfc:
+            raise frappe.ValidationError("El cliente no tiene RFC (tax_id).")
+        if not customer_tax_regime:
+            raise frappe.ValidationError(
+                "El cliente no tiene régimen fiscal SAT (mx_tax_regime)."
+            )
+
+        related_documents = []
+        total_amount = 0.0
+        for reference in payment_entry.references:
+            if getattr(reference, "reference_doctype", None) != "Sales Invoice":
+                continue
+            if not getattr(reference, "reference_name", None):
+                continue
+
+            invoice = frappe.get_doc("Sales Invoice", reference.reference_name)
+            if getattr(invoice, "docstatus", 0) != 1:
+                raise frappe.ValidationError(
+                    f"La factura {invoice.name} no está contabilizada (docstatus != 1)."
+                )
+
+            cfdi_id = getattr(invoice, "facturama_cfdi_id", None) or getattr(
+                invoice, "cfdi_id", None
+            )
+            if not cfdi_id:
+                raise frappe.ValidationError(
+                    f"La factura {invoice.name} no tiene un CFDI timbrado asociado."
+                )
+
+            uuid = ""
+            serie = ""
+            folio = ""
+            try:
+                detail = self.get_cfdi_detail(cfdi_id)
+                complement = detail.get("Complement", {}) or {}
+                tax_stamp = complement.get("TaxStamp", {}) or {}
+                uuid = (
+                    tax_stamp.get("Uuid", "")
+                    or tax_stamp.get("UUID", "")
+                    or detail.get("Uuid", "")
+                    or detail.get("UUID", "")
+                )
+                serie = detail.get("Serie", "") or ""
+                folio = detail.get("Folio", "") or ""
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    "Facturama get_cfdi_detail for payment complement",
+                )
+
+            if not uuid:
+                raise frappe.ValidationError(
+                    f"No se pudo obtener el UUID del CFDI de la factura {invoice.name}."
+                )
+
+            invoice_grand_total = float(getattr(invoice, "grand_total", 0) or 0)
+            amount_paid = float(getattr(reference, "allocated_amount", 0) or 0)
+            if amount_paid <= 0:
+                raise frappe.ValidationError(
+                    f"El monto asignado de la factura {invoice.name} debe ser mayor a 0."
+                )
+            total_amount += amount_paid
+
+            prior = self._get_prior_paid_for_invoice(
+                invoice.name, exclude_payment=payment_entry.name
+            )
+            previous_balance = round(invoice_grand_total - prior, 2)
+            remaining = round(previous_balance - amount_paid, 2)
+            if previous_balance < 0:
+                previous_balance = round(invoice_grand_total, 2)
+                remaining = round(invoice_grand_total - amount_paid, 2)
+            partiality = self._get_partiality_number(
+                invoice.name, exclude_payment=payment_entry.name
+            )
+
+            taxes = self._get_prorated_taxes(invoice, amount_paid, invoice_grand_total)
+
+            related = {
+                "TaxObject": "02" if taxes else "01",
+                "Uuid": uuid,
+                "Serie": serie,
+                "Folio": folio or invoice.name,
+                "PaymentMethod": self._get_invoice_payment_method(invoice),
+                "PartialityNumber": partiality,
+                "PreviousBalanceAmount": previous_balance,
+                "AmountPaid": amount_paid,
+                "ImpSaldoInsoluto": remaining,
+            }
+
+            currency = getattr(invoice, "currency", None) or "MXN"
+            if currency and currency != "MXN":
+                related["Currency"] = currency
+                related["EquivalenceDocRel"] = 1
+
+            if taxes:
+                related["Taxes"] = taxes
+
+            related_documents.append(related)
+
+        if not related_documents:
+            raise frappe.ValidationError(
+                "El Payment Entry no referencia ninguna factura de venta válida."
+            )
+
+        payment_date = getattr(payment_entry, "posting_date", None)
+        if payment_date:
+            payment_date = payment_date.isoformat()
+
+        return {
+            "CfdiType": "P",
+            "NameId": "14",
+            "Folio": getattr(payment_entry, "name", "") or "1",
+            "ExpeditionPlace": settings.get("zip_code_company") or "",
+            "Receiver": {
+                "Rfc": customer_rfc,
+                "CfdiUse": "CP01",
+                "Name": customer_name,
+                "FiscalRegime": customer_tax_regime,
+                "TaxZipCode": customer_zip or "",
+            },
+            "Complemento": {
+                "Payments": [
+                    {
+                        "Date": payment_date or frappe.utils.today(),
+                        "PaymentForm": settings.get("default_payment_form") or "03",
+                        "Amount": paid_amount,
+                        "Currency": "MXN",
+                        "RelatedDocuments": related_documents,
+                    }
+                ]
+            },
+        }
+
+    def _get_invoice_payment_method(self, invoice):
+        """Return PPD or PUE from the invoice, defaulting to PPD for complements."""
+        value = getattr(invoice, "payment_method", None)
+        if value in ("PPD", "PUE"):
+            return value
+        return "PPD"
+
+    def _get_prior_paid_for_invoice(self, invoice_name, exclude_payment=None):
+        """Sum of amounts already covered by prior issued payment complements."""
+        query = """
+            SELECT COALESCE(SUM(ref.allocated_amount), 0)
+            FROM `tabPayment Entry Reference` ref
+            INNER JOIN `tabPayment Entry` pe ON pe.name = ref.parent
+            WHERE ref.reference_doctype = 'Sales Invoice'
+              AND ref.reference_name = %s
+              AND pe.docstatus = 1
+              AND COALESCE(pe.facturama_complement_cfdi_id, '') <> ''
+        """
+        values = [invoice_name]
+        if exclude_payment:
+            query += " AND pe.name != %s"
+            values.append(exclude_payment)
+        return float(frappe.db.sql(query, values)[0][0] or 0)
+
+    def _get_partiality_number(self, invoice_name, exclude_payment=None):
+        """Number of the current partial payment (1 for the first one).
+
+        Counts only submitted Payment Entries that already issued a complement.
+        """
+        query = """
+            SELECT COUNT(*)
+            FROM `tabPayment Entry Reference` ref
+            INNER JOIN `tabPayment Entry` pe ON pe.name = ref.parent
+            WHERE ref.reference_doctype = 'Sales Invoice'
+              AND ref.reference_name = %s
+              AND pe.docstatus = 1
+              AND COALESCE(pe.facturama_complement_cfdi_id, '') <> ''
+        """
+        values = [invoice_name]
+        if exclude_payment:
+            query += " AND pe.name != %s"
+            values.append(exclude_payment)
+        count = frappe.db.sql(query, values)[0][0]
+        return int(count or 0) + 1
+
+    def _get_prorated_taxes(self, invoice, amount_paid, invoice_grand_total):
+        """Allocate invoice taxes proportionally to the amount paid."""
+        if invoice_grand_total <= 0 or amount_paid <= 0:
+            return []
+
+        taxes = []
+        ratio = amount_paid / invoice_grand_total
+        for tax in getattr(invoice, "taxes", []) or []:
+            tax_amount = float(
+                getattr(tax, "tax_amount_after_discount_amount", 0) or 0
+            ) or float(getattr(tax, "tax_amount", 0) or 0)
+            if not tax_amount:
+                continue
+
+            allocated = round(tax_amount * ratio, 2)
+            if abs(allocated) < 0.01:
+                continue
+
+            rate = float(getattr(tax, "rate", 0) or 0) / 100
+            base = round(allocated / rate, 2) if rate else round(amount_paid, 2)
+
+            account_name = (getattr(tax, "account_head", "") or "").lower()
+            description = (getattr(tax, "description", "") or "").lower()
+            is_retention = allocated < 0 or "retenci" in account_name or "retenci" in description
+            name = (
+                "IVA"
+                if "iva" in account_name or "iva" in description
+                else getattr(tax, "description", "") or "Impuesto"
+            )
+
+            taxes.append({
+                "Name": name,
+                "Rate": rate,
+                "Total": abs(allocated),
+                "Base": base,
+                "IsRetention": is_retention,
+            })
+
+        return taxes
 
     def list_multiemisor_cfdis(self, **filters):
         """List multi-emisor CFDIs without exposing them in the Facturama UI."""
