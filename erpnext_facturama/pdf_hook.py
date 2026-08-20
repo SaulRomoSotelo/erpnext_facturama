@@ -3,6 +3,33 @@ import base64
 import xml.etree.ElementTree as ET
 
 
+def get_issuer_legal_name(doc):
+    """Return the legal name registered on the CSD certificate associated to the issuer RFC."""
+    if not doc or not doc.company:
+        return ""
+    emisor = frappe.db.get_value(
+        "Facturama Emisor", {"company": doc.company, "active": 1}, "certificate_file"
+    )
+    if not emisor:
+        return ""
+    file_doc = frappe.db.get_value("File", {"file_url": emisor}, ["name", "is_private"], as_dict=True)
+    if not file_doc or not file_doc.is_private:
+        return ""
+    try:
+        content = frappe.get_doc("File", file_doc.name).get_content()
+    except Exception:
+        return ""
+    try:
+        from cryptography import x509
+        cert = x509.load_der_x509_certificate(content)
+        for attr in cert.subject:
+            if attr.oid._name == "commonName" and attr.value:
+                return str(attr.value)
+    except Exception:
+        pass
+    return ""
+
+
 def inject_cfdi_seals(jenv, template, print_format, args):
     """Hook: injects parsed CFDI seal data into print format context, then renders HTML."""
     default_seals = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": "", "rfc_prov_certif": "", "fecha_timbrado": ""}
@@ -49,4 +76,5 @@ def inject_cfdi_seals(jenv, template, print_format, args):
                 frappe.log_error(f"[pdf_hook] Error parsing CFDI XML for {doc.name}: {e}", "pdf_hook")
 
     args["seals"] = seals
+    args["issuer_name"] = get_issuer_legal_name(doc)
     return template.render(args, filters={"len": len})

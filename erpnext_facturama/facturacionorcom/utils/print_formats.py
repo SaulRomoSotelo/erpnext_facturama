@@ -298,6 +298,7 @@ ARROSA_SALES_INVOICE_HTML = """
 {% set customer = frappe.get_doc("Customer", doc.customer) if doc.customer else None %}
 {% set customer_zip = frappe.db.get_value("Address", doc.customer_address, "pincode") if doc.customer_address else "" %}
 {% set company_zip = (frappe.db.get_value("Facturama Emisor", {"company": doc.company, "active": 1}, "expedition_place") if doc.company else "") or "" %}
+{% set issuer_name = issuer_name|default('') %}
 {% set invoice_uuid = doc.mx_uuid or "" %}
 <div class="arrosa-invoice">
   <table class="inv-header">
@@ -317,7 +318,7 @@ ARROSA_SALES_INVOICE_HTML = """
     <tr>
       <td class="meta-col">
         <div><span class="k">RFC emisor:</span> {{ (company.tax_id if company else "") or "" }}</div>
-        <div><span class="k">Nombre emisor:</span> {{ (company.company_name if company else doc.company) or "" }}</div>
+        <div><span class="k">Nombre emisor:</span> {{ issuer_name or (company.company_name if company else doc.company) or "" }}</div>
         <div><span class="k">Folio:</span> {{ doc.name }}</div>
         <div><span class="k">RFC receptor:</span> {{ (customer.tax_id if customer else "") or "" }}</div>
         <div><span class="k">Nombre receptor:</span> {{ doc.customer_name or doc.customer or "" }}</div>
