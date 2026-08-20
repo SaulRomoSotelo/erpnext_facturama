@@ -288,6 +288,7 @@ ARROSA_SALES_INVOICE_HTML = """
 {% set logo_url = frappe.utils.get_url(company.company_logo) if company and company.company_logo else "" %}
 {% set customer = frappe.get_doc("Customer", doc.customer) if doc.customer else None %}
 {% set customer_zip = frappe.db.get_value("Address", doc.customer_address, "pincode") if doc.customer_address else "" %}
+{% set company_zip = (frappe.db.get_value("Facturama Emisor", {"company": doc.company, "active": 1}, "expedition_place") if doc.company else "") or "" %}
 {% set invoice_uuid = doc.mx_uuid or "" %}
 <div class="arrosa-invoice">
   <table class="inv-header">
@@ -315,9 +316,10 @@ ARROSA_SALES_INVOICE_HTML = """
         <div><span class="k">Uso CFDI:</span> {{ doc.mx_cfdi_use or "" }}</div>
       </td>
       <td class="meta-col">
-        <div><span class="k">UUID fiscal:</span> {{ invoice_uuid }}</div>
+        <div><span class="k">Folio fiscal:</span> {{ invoice_uuid }}</div>
         <div><span class="k">Serie:</span> {{ doc.naming_series or "" }}</div>
-        <div><span class="k">Codigo postal, fecha y hora emision:</span> {{ frappe.utils.format_datetime(doc.posting_date ~ " " ~ (doc.posting_time or "00:00:00")) }}</div>
+        <div><span class="k">Codigo postal emisor:</span> {{ company_zip or "" }}</div>
+        <div><span class="k">Fecha y hora emision:</span> {{ frappe.utils.format_datetime(doc.posting_date ~ " " ~ (doc.posting_time or "00:00:00")) }}</div>
         <div><span class="k">Efecto de comprobante:</span> Ingreso</div>
         <div><span class="k">Regimen fiscal:</span> {{ (company.mx_tax_regime if company and company.mx_tax_regime else (company.sat_tax_regime if company else "")) or "" }}</div>
         <div><span class="k">Exportacion:</span> No aplica</div>
@@ -423,8 +425,6 @@ ARROSA_SALES_INVOICE_HTML = """
     {% endif %}
   </div>
   {% endif %}
-
-  <div class="footer-note">Este documento es una representacion impresa de un CFDI.</div>
 </div>
 """.strip()
 
@@ -433,12 +433,12 @@ ARROSA_SALES_INVOICE_CSS = """
 .arrosa-invoice {
   font-family: "Helvetica Neue", Arial, sans-serif;
   color: #2a2a2a;
-  font-size: 11px;
+  font-size: 10px;
 }
 .arrosa-invoice .inv-header {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .arrosa-invoice .inv-header .logo-cell {
   width: 40%;
@@ -447,24 +447,24 @@ ARROSA_SALES_INVOICE_CSS = """
 .arrosa-invoice .inv-header .title-cell {
   width: 60%;
   vertical-align: middle;
-  font-size: 33px;
+  font-size: 27px;
   font-weight: 700;
   text-align: center;
   letter-spacing: 0.4px;
 }
 .arrosa-invoice .logo {
-  max-width: 120px;
-  max-height: 90px;
+  max-width: 110px;
+  max-height: 80px;
   object-fit: contain;
 }
 .arrosa-invoice .logo-fallback {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 .arrosa-invoice .meta-grid {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .arrosa-invoice .meta-grid .meta-col {
   width: 50%;
@@ -472,7 +472,7 @@ ARROSA_SALES_INVOICE_CSS = """
   padding: 0;
 }
 .arrosa-invoice .meta-grid .meta-col > div {
-  margin: 2px 0;
+  margin: 1px 0;
 }
 .arrosa-invoice .meta-grid .meta-col:first-child {
   padding-right: 12px;
@@ -481,9 +481,9 @@ ARROSA_SALES_INVOICE_CSS = """
   font-weight: 700;
 }
 .arrosa-invoice .section-title {
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 .arrosa-invoice .items {
   width: 100%;
@@ -493,9 +493,9 @@ ARROSA_SALES_INVOICE_CSS = """
 .arrosa-invoice .items th,
 .arrosa-invoice .items td {
   border: 1px solid #8d8d8d;
-  padding: 4px 5px;
+  padding: 3px 5px;
   vertical-align: top;
-  font-size: 10px;
+  font-size: 9px;
 }
 .arrosa-invoice .items th {
   background: #f4f4f4;
