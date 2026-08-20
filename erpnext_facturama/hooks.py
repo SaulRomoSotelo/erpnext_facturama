@@ -187,6 +187,10 @@ doctype_js = {
 # 	"Task": "erpnext_facturama.custom.task.CustomTaskMixin"
 # }
 
+extend_doctype_class = {
+	"Sales Invoice": "erpnext_facturama.facturacionorcom.custom.sales_invoice.SalesInvoiceFacturamaMixin",
+}
+
 # Overriding Methods
 # ------------------------------
 #

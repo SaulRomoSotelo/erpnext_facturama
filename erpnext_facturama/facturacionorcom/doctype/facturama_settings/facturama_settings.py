@@ -257,8 +257,12 @@ def _initialize_folio_series():
 	frappe.db.commit()
 
 
-def get_next_sales_invoice_folio():
-	"""Return the next CFDI folio number (atomic increment, no zero padding)."""
+def get_next_sales_invoice_folio(commit=True):
+	"""Return the next CFDI folio number (atomic increment, no zero padding).
+
+	``commit=False`` is used from the autoname mixin so the counter is saved
+	together with the document transaction.
+	"""
 	_initialize_folio_series()
 	next_value = frappe.db.sql(
 		"SELECT current FROM `tabSeries` WHERE name = %s FOR UPDATE",
@@ -268,7 +272,8 @@ def get_next_sales_invoice_folio():
 		"UPDATE `tabSeries` SET current = %s WHERE name = %s",
 		(next_value + 1, FOLIO_SERIES_NAME),
 	)
-	frappe.db.commit()
+	if commit:
+		frappe.db.commit()
 	return int(next_value + 1)
 
 
@@ -317,6 +322,7 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 				"default_payment_method": "PUE",
 				"default_cfdi_use": "G03",
 				"series": None,
+				"serie": "A",
 				"folio": getattr(invoice, "facturama_folio", None) or None,
 				"issuer_name": _get_issuer_name(invoice.company, client.sandbox),
 				"zip_code_company": _get_primary_company_pincode(invoice.company),
