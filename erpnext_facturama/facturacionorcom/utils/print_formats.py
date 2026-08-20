@@ -413,7 +413,7 @@ ARROSA_SALES_INVOICE_HTML = """
 
     {% if seals.qr_url %}
     <div class="qr-section">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ seals.qr_url }}" alt="CFDI QR" />
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ seals.qr_url|urlencode }}" alt="CFDI QR" />
     </div>
     {% endif %}
   </div>

@@ -552,17 +552,23 @@ class FacturamaClient:
                     "Unit": item.get("unit", "Pieza"),
                     "UnitCode": item.get("unit_code", "E48"),
                     "TaxObject": "02" if item.get("taxes") else "01",
-                    "Taxes": [
+                    **(
                         {
-                            "Name": tax.get("name", "IVA"),
-                            "Rate": tax.get("rate", 0),
-                            "Total": tax.get("amount", 0),
-                            "Base": item.get("amount", 0),
-                            "IsRetention": False,
+                            "Taxes": [
+                                {
+                                    "Name": tax.get("name", "IVA"),
+                                    "Rate": tax.get("rate", 0),
+                                    "Total": tax.get("amount", 0),
+                                    "Base": item.get("amount", 0),
+                                    "IsRetention": False,
+                                }
+                                for tax in item.get("taxes", [])
+                                if tax.get("amount", 0)
+                            ]
                         }
-                        for tax in item.get("taxes", [])
-                        if tax.get("amount", 0)
-                    ],
+                        if item.get("taxes")
+                        else {}
+                    ),
                     "Total": item.get("amount", 0) + sum(
                         tax.get("amount", 0) for tax in item.get("taxes", [])
                     ),
