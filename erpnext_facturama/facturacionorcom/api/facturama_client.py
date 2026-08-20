@@ -524,7 +524,7 @@ class FacturamaClient:
 
         return {
             "CfdiType": "I",
-            "Folio": getattr(invoice, "name", "") or "1",
+            "Folio": settings.get("folio") or getattr(invoice, "facturama_folio", None) or getattr(invoice, "name", "") or "1",
             "PaymentForm": payload.pop("payment_form"),
             "PaymentMethod": payload.pop("payment_method"),
             "Currency": payload.pop("currency"),

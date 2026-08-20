@@ -222,6 +222,56 @@ def _ensure_sales_invoice_facturama_field():
 	}).insert(ignore_permissions=True)
 
 
+FOLIO_SERIES_NAME = "SALES-INVOICE-FOLIO"
+FOLIO_START = 861
+
+
+def _ensure_sales_invoice_folio_field():
+	"""Ensure the custom field that stores the Facturama CFDI folio on Sales Invoice."""
+	exists = frappe.db.exists(
+		"Custom Field", {"dt": "Sales Invoice", "fieldname": "facturama_folio"}
+	)
+	if exists:
+		return
+
+	frappe.get_doc({
+		"doctype": "Custom Field",
+		"dt": "Sales Invoice",
+		"fieldname": "facturama_folio",
+		"label": "Facturama Folio",
+		"fieldtype": "Data",
+		"insert_after": "facturama_cfdi_id",
+		"hidden": 1,
+		"translatable": 0,
+	}).insert(ignore_permissions=True)
+
+
+def _initialize_folio_series():
+	"""Create the folio counter row if it does not exist yet."""
+	if frappe.db.exists("Series", FOLIO_SERIES_NAME):
+		return
+	frappe.db.sql(
+		"INSERT INTO `tabSeries` (name, current) VALUES (%s, %s)",
+		(FOLIO_SERIES_NAME, FOLIO_START - 1),
+	)
+	frappe.db.commit()
+
+
+def get_next_sales_invoice_folio():
+	"""Return the next CFDI folio number (atomic increment, no zero padding)."""
+	_initialize_folio_series()
+	next_value = frappe.db.sql(
+		"SELECT current FROM `tabSeries` WHERE name = %s FOR UPDATE",
+		FOLIO_SERIES_NAME,
+	)[0][0]
+	frappe.db.sql(
+		"UPDATE `tabSeries` SET current = %s WHERE name = %s",
+		(next_value + 1, FOLIO_SERIES_NAME),
+	)
+	frappe.db.commit()
+	return int(next_value + 1)
+
+
 def build_cancel_params(cfdi_id, motive="02", uuid_replacement=None):
 	params = {"motive": motive}
 	if uuid_replacement:
@@ -251,6 +301,13 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 
 		invoice = frappe.get_doc("Sales Invoice", sales_invoice)
 		_ensure_sales_invoice_facturama_field()
+		_ensure_sales_invoice_folio_field()
+
+		if not getattr(invoice, "facturama_folio", None):
+			facturama_folio = str(get_next_sales_invoice_folio())
+			invoice.db_set("facturama_folio", facturama_folio)
+			frappe.db.commit()
+
 		client = get_facturama_client()
 		payload = client.build_multiemisor_payload(
 			invoice,
@@ -260,6 +317,7 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 				"default_payment_method": "PUE",
 				"default_cfdi_use": "G03",
 				"series": None,
+				"folio": getattr(invoice, "facturama_folio", None) or None,
 				"issuer_name": _get_issuer_name(invoice.company, client.sandbox),
 				"zip_code_company": _get_primary_company_pincode(invoice.company),
 				"save_xml": 0,
