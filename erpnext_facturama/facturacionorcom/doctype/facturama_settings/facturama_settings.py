@@ -339,7 +339,7 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 				xml_text = client.download_multiemisor_cfdi_xml(cfdi_id)
 				invoice.db_set("mx_stamped_xml", xml_text)
 				invoice.db_set("mx_uuid", _extract_uuid_from_xml(xml_text))
-				invoice.db_set("mx_cfdi_status", "Valido")
+				invoice.db_set("mx_cfdi_status", _get_valid_status_value())
 			except Exception as exc:
 				frappe.log_error(
 					frappe.get_traceback(),
@@ -355,6 +355,18 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 	except Exception as exc:
 		frappe.log_error(frappe.get_traceback(), "Facturama stamping")
 		return {"ok": False, "error": str(exc)}
+
+
+def _get_valid_status_value():
+	"""Return the Select option that means 'Valid' for mx_cfdi_status, matching the field's options regardless of language/accent."""
+	options = frappe.get_meta("Sales Invoice").get_field("mx_cfdi_status")
+	options_list = []
+	if options and options.get("options"):
+		options_list = [opt.strip() for opt in options.get("options").splitlines() if opt.strip()]
+	for opt in options_list:
+		if opt.lower().replace("á", "a") in ("valid", "valido", "vigente"):
+			return opt
+	return options_list[0] if options_list else "Valido"
 
 
 def _extract_uuid_from_xml(xml_text):
