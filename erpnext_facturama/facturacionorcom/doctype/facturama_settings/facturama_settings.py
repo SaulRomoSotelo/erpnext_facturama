@@ -4,6 +4,7 @@
 import frappe
 import base64
 import re
+import xml.etree.ElementTree as ET
 from frappe.model.document import Document
 
 import erpnext_facturama.facturacionorcom.api.facturama_client
@@ -334,6 +335,16 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 		cfdi_id = erpnext_facturama.facturacionorcom.api.facturama_client.extract_cfdi_id(response)
 		if cfdi_id:
 			invoice.db_set("facturama_cfdi_id", cfdi_id)
+			try:
+				xml_text = client.download_multiemisor_cfdi_xml(cfdi_id)
+				invoice.db_set("mx_stamped_xml", xml_text)
+				invoice.db_set("mx_uuid", _extract_uuid_from_xml(xml_text))
+				invoice.db_set("mx_cfdi_status", "Valido")
+			except Exception as exc:
+				frappe.log_error(
+					frappe.get_traceback(),
+					f"Facturama stamping - XML guardado falló para {invoice.name}: {exc}",
+				)
 			frappe.db.commit()
 		return {
 			"ok": True,
@@ -344,6 +355,20 @@ def stamp_sales_invoice_with_facturama(sales_invoice):
 	except Exception as exc:
 		frappe.log_error(frappe.get_traceback(), "Facturama stamping")
 		return {"ok": False, "error": str(exc)}
+
+
+def _extract_uuid_from_xml(xml_text):
+	"""Extract the fiscal folio (UUID) from a stamped CFDI XML string."""
+	if not xml_text:
+		return ""
+	try:
+		root = ET.fromstring(xml_text)
+		ns_tfd = "http://www.sat.gob.mx/TimbreFiscalDigital"
+		for elem in root.iter("{" + ns_tfd + "}TimbreFiscalDigital"):
+			return elem.get("UUID", "")
+	except Exception:
+		pass
+	return ""
 
 
 @frappe.whitelist()

@@ -383,9 +383,9 @@ ARROSA_SALES_INVOICE_HTML = """
     </table>
   </div>
 
-  {% set seals = frappe.call("erpnext_facturama.facturacionorcom.utils.print_formats.get_cfdi_seals", doc=doc) %}
+  {% set seals = seals|default({}) %}
 
-  {% if invoice_uuid %}
+  {% if invoice_uuid or seals.get('uuid') %}
   <div class="seal-section">
     <div class="seal-title">Sellos Digitales</div>
 
@@ -408,7 +408,7 @@ ARROSA_SALES_INVOICE_HTML = """
     </div>
 
     <div class="seal-row">
-      <span class="k">UUID:</span> {{ invoice_uuid }}
+      <span class="k">UUID:</span> {{ invoice_uuid or seals.get('uuid') or "" }}
     </div>
 
     {% if seals.qr_url %}
