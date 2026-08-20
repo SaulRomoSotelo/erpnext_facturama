@@ -287,38 +287,43 @@ ARROSA_SALES_INVOICE_HTML = """
 {% set company = frappe.get_doc("Company", doc.company) if doc.company else None %}
 {% set logo_url = frappe.utils.get_url(company.company_logo) if company and company.company_logo else "" %}
 {% set customer = frappe.get_doc("Customer", doc.customer) if doc.customer else None %}
+{% set customer_zip = frappe.db.get_value("Address", doc.customer_address, "pincode") if doc.customer_address else "" %}
 {% set invoice_uuid = doc.mx_uuid or "" %}
 <div class="arrosa-invoice">
-  <div class="inv-header">
-    <div class="logo-box">
-      {% if logo_url %}
-      <img src="{{ logo_url }}" class="logo" alt="Arrosa Medical" />
-      {% else %}
-      <div class="logo-fallback">ARROSA MEDICAL</div>
-      {% endif %}
-    </div>
-    <div class="title-box">ARROSA MEDICAL</div>
-  </div>
+  <table class="inv-header">
+    <tr>
+      <td class="logo-cell">
+        {% if logo_url %}
+        <img src="{{ logo_url }}" class="logo" alt="Arrosa Medical" />
+        {% else %}
+        <div class="logo-fallback">ARROSA MEDICAL</div>
+        {% endif %}
+      </td>
+      <td class="title-cell">ARROSA MEDICAL</td>
+    </tr>
+  </table>
 
-  <div class="meta-grid">
-    <div>
-      <div><span class="k">RFC emisor:</span> {{ (company.tax_id if company else "") or "" }}</div>
-      <div><span class="k">Nombre emisor:</span> {{ (company.company_name if company else doc.company) or "" }}</div>
-      <div><span class="k">Folio:</span> {{ doc.name }}</div>
-      <div><span class="k">RFC receptor:</span> {{ (customer.tax_id if customer else "") or "" }}</div>
-      <div><span class="k">Nombre receptor:</span> {{ doc.customer_name or doc.customer or "" }}</div>
-      <div><span class="k">Codigo postal receptor:</span> {{ doc.customer_address or "" }}</div>
-      <div><span class="k">Uso CFDI:</span> {{ doc.mx_cfdi_use or "" }}</div>
-    </div>
-    <div>
-      <div><span class="k">UUID fiscal:</span> {{ invoice_uuid }}</div>
-      <div><span class="k">Serie:</span> {{ doc.naming_series or "" }}</div>
-      <div><span class="k">Codigo postal, fecha y hora emision:</span> {{ frappe.utils.format_datetime(doc.posting_date ~ " " ~ (doc.posting_time or "00:00:00")) }}</div>
-      <div><span class="k">Efecto de comprobante:</span> Ingreso</div>
-      <div><span class="k">Regimen fiscal:</span> {{ (company.mx_tax_regime if company and company.mx_tax_regime else (company.sat_tax_regime if company else "")) or "" }}</div>
-      <div><span class="k">Exportacion:</span> No aplica</div>
-    </div>
-  </div>
+  <table class="meta-grid">
+    <tr>
+      <td class="meta-col">
+        <div><span class="k">RFC emisor:</span> {{ (company.tax_id if company else "") or "" }}</div>
+        <div><span class="k">Nombre emisor:</span> {{ (company.company_name if company else doc.company) or "" }}</div>
+        <div><span class="k">Folio:</span> {{ doc.name }}</div>
+        <div><span class="k">RFC receptor:</span> {{ (customer.tax_id if customer else "") or "" }}</div>
+        <div><span class="k">Nombre receptor:</span> {{ doc.customer_name or doc.customer or "" }}</div>
+        <div><span class="k">Codigo postal receptor:</span> {{ customer_zip or "" }}</div>
+        <div><span class="k">Uso CFDI:</span> {{ doc.mx_cfdi_use or "" }}</div>
+      </td>
+      <td class="meta-col">
+        <div><span class="k">UUID fiscal:</span> {{ invoice_uuid }}</div>
+        <div><span class="k">Serie:</span> {{ doc.naming_series or "" }}</div>
+        <div><span class="k">Codigo postal, fecha y hora emision:</span> {{ frappe.utils.format_datetime(doc.posting_date ~ " " ~ (doc.posting_time or "00:00:00")) }}</div>
+        <div><span class="k">Efecto de comprobante:</span> Ingreso</div>
+        <div><span class="k">Regimen fiscal:</span> {{ (company.mx_tax_regime if company and company.mx_tax_regime else (company.sat_tax_regime if company else "")) or "" }}</div>
+        <div><span class="k">Exportacion:</span> No aplica</div>
+      </td>
+    </tr>
+  </table>
 
   <div class="section-title">Conceptos</div>
   <table class="items">
@@ -431,34 +436,46 @@ ARROSA_SALES_INVOICE_CSS = """
   font-size: 11px;
 }
 .arrosa-invoice .inv-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
+  width: 100%;
+  border-collapse: collapse;
   margin-bottom: 10px;
+}
+.arrosa-invoice .inv-header .logo-cell {
+  width: 40%;
+  vertical-align: middle;
+}
+.arrosa-invoice .inv-header .title-cell {
+  width: 60%;
+  vertical-align: middle;
+  font-size: 33px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.4px;
 }
 .arrosa-invoice .logo {
   max-width: 120px;
   max-height: 90px;
   object-fit: contain;
 }
-.arrosa-invoice .title-box {
-  font-size: 33px;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 0.4px;
-}
 .arrosa-invoice .logo-fallback {
   font-size: 18px;
   font-weight: 700;
 }
 .arrosa-invoice .meta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 18px;
+  width: 100%;
+  border-collapse: collapse;
   margin-bottom: 10px;
 }
-.arrosa-invoice .meta-grid > div > div {
+.arrosa-invoice .meta-grid .meta-col {
+  width: 50%;
+  vertical-align: top;
+  padding: 0;
+}
+.arrosa-invoice .meta-grid .meta-col > div {
   margin: 2px 0;
+}
+.arrosa-invoice .meta-grid .meta-col:first-child {
+  padding-right: 12px;
 }
 .arrosa-invoice .k {
   font-weight: 700;
