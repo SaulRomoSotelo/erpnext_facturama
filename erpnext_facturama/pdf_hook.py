@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 def inject_cfdi_seals(jenv, template, print_format, args):
     """Hook: injects parsed CFDI seal data into print format context, then renders HTML."""
-    default_seals = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": ""}
+    default_seals = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": ""}
     doc = args.get("doc")
     seals = dict(default_seals)
 
@@ -27,6 +27,13 @@ def inject_cfdi_seals(jenv, template, print_format, args):
                     seals["no_cert_sat"] = elem.get("NoCertificadoSAT", "")
                     seals["sello_sat"] = elem.get("SelloSAT", "")
                     seals["uuid"] = elem.get("UUID", "")
+                    fecha_timbrado = elem.get("FechaTimbrado", "")
+                    rfc_prov = elem.get("RfcProvCertif", "")
+                    sello_cfd = elem.get("SelloCFD", "")
+                    seals["cadena_original"] = (
+                        f"||1.1|{seals['uuid']}|{fecha_timbrado}|{rfc_prov}|{sello_cfd}|"
+                        f"{seals['no_cert_sat']}|{seals['sello_sat']}||"
+                    )
 
                 company = frappe.db.get_value("Company", doc.company, "tax_id") if doc.company else ""
                 customer_rfc = frappe.db.get_value("Customer", doc.customer, "tax_id") if doc.customer else ""

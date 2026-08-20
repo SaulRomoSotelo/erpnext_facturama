@@ -251,7 +251,7 @@ def get_cfdi_seals(doc):
     """Extract CFDI seal data from stamped XML."""
     import base64
     import xml.etree.ElementTree as ET
-    result = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": ""}
+    result = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": ""}
     if not doc.mx_stamped_xml:
         return result
     try:
@@ -272,6 +272,13 @@ def get_cfdi_seals(doc):
         result["no_cert_sat"] = elem.get("NoCertificadoSAT", "")
         result["sello_sat"] = elem.get("SelloSAT", "")
         result["uuid"] = elem.get("UUID", "")
+        fecha_timbrado = elem.get("FechaTimbrado", "")
+        rfc_prov = elem.get("RfcProvCertif", "")
+        sello_cfd = elem.get("SelloCFD", "")
+        result["cadena_original"] = (
+            f"||1.1|{result['uuid']}|{fecha_timbrado}|{rfc_prov}|{sello_cfd}|"
+            f"{result['no_cert_sat']}|{result['sello_sat']}||"
+        )
     # Build QR URL
     company = frappe.get_doc("Company", doc.company) if doc.company else None
     customer = frappe.get_doc("Customer", doc.customer) if doc.customer else None
@@ -317,6 +324,7 @@ ARROSA_SALES_INVOICE_HTML = """
       </td>
       <td class="meta-col">
         <div><span class="k">Folio fiscal:</span> {{ invoice_uuid }}</div>
+        <div><span class="k">No. serie del CSD:</span> {{ (seals|default({})).get('no_cert_emisor', '') }}</div>
         <div><span class="k">Serie:</span> {{ doc.naming_series or "" }}</div>
         <div><span class="k">Codigo postal, fecha y hora emision:</span> {{ (company_zip or "") }} {{ frappe.utils.format_datetime(doc.posting_date ~ " " ~ (doc.posting_time or "00:00:00")) }}</div>
         <div><span class="k">Efecto de comprobante:</span> Ingreso</div>
@@ -418,9 +426,17 @@ ARROSA_SALES_INVOICE_HTML = """
     </div>
 
     {% if seals.qr_url %}
-    <div class="qr-section">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ seals.qr_url|urlencode }}" alt="CFDI QR" />
-    </div>
+    <table class="qr-cadena">
+      <tr>
+        <td class="qr-cell">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ seals.qr_url|urlencode }}" alt="CFDI QR" />
+        </td>
+        <td class="cadena-cell">
+          <div class="k">Cadena Original del complemento de certificacion digital del SAT:</div>
+          <div class="cadena-text">{{ seals.cadena_original }}</div>
+        </td>
+      </tr>
+    </table>
     {% endif %}
   </div>
   {% endif %}
@@ -559,9 +575,28 @@ ARROSA_SALES_INVOICE_CSS = """
   max-height: 60px;
   overflow: hidden;
 }
-.arrosa-invoice .qr-section {
-  text-align: center;
+.arrosa-invoice .qr-cadena {
+  width: 100%;
+  border-collapse: collapse;
   margin-top: 12px;
+}
+.arrosa-invoice .qr-cadena .qr-cell {
+  width: 160px;
+  vertical-align: middle;
+  text-align: center;
+}
+.arrosa-invoice .qr-cadena .cadena-cell {
+  vertical-align: middle;
+  padding-left: 14px;
+}
+.arrosa-invoice .cadena-text {
+  font-family: monospace;
+  font-size: 8px;
+  line-height: 1.3;
+  background: #f8f8f8;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  word-break: break-all;
 }
 """.strip()
 
