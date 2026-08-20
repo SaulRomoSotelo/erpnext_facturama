@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 def inject_cfdi_seals(jenv, template, print_format, args):
     """Hook: injects parsed CFDI seal data into print format context, then renders HTML."""
-    default_seals = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": ""}
+    default_seals = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": "", "rfc_prov_certif": "", "fecha_timbrado": ""}
     doc = args.get("doc")
     seals = dict(default_seals)
 
@@ -29,6 +29,8 @@ def inject_cfdi_seals(jenv, template, print_format, args):
                     seals["uuid"] = elem.get("UUID", "")
                     fecha_timbrado = elem.get("FechaTimbrado", "")
                     rfc_prov = elem.get("RfcProvCertif", "")
+                    seals["rfc_prov_certif"] = rfc_prov
+                    seals["fecha_timbrado"] = fecha_timbrado
                     sello_cfd = elem.get("SelloCFD", "")
                     seals["cadena_original"] = (
                         f"||1.1|{seals['uuid']}|{fecha_timbrado}|{rfc_prov}|{sello_cfd}|"

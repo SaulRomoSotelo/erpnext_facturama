@@ -251,7 +251,7 @@ def get_cfdi_seals(doc):
     """Extract CFDI seal data from stamped XML."""
     import base64
     import xml.etree.ElementTree as ET
-    result = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": ""}
+    result = {"sello_emisor": "", "no_cert_emisor": "", "sello_sat": "", "no_cert_sat": "", "uuid": "", "qr_url": "", "cadena_original": "", "rfc_prov_certif": "", "fecha_timbrado": ""}
     if not doc.mx_stamped_xml:
         return result
     try:
@@ -274,6 +274,8 @@ def get_cfdi_seals(doc):
         result["uuid"] = elem.get("UUID", "")
         fecha_timbrado = elem.get("FechaTimbrado", "")
         rfc_prov = elem.get("RfcProvCertif", "")
+        result["rfc_prov_certif"] = rfc_prov
+        result["fecha_timbrado"] = fecha_timbrado
         sello_cfd = elem.get("SelloCFD", "")
         result["cadena_original"] = (
             f"||1.1|{result['uuid']}|{fecha_timbrado}|{rfc_prov}|{sello_cfd}|"
@@ -434,6 +436,11 @@ ARROSA_SALES_INVOICE_HTML = """
         <td class="cadena-cell">
           <div class="k">Cadena Original del complemento de certificacion digital del SAT:</div>
           <div class="cadena-text">{{ seals.cadena_original }}</div>
+          <div class="cert-meta">
+            <div><span class="k">RFC del proveedor de certificacion:</span> {{ seals.rfc_prov_certif }}</div>
+            <div><span class="k">Fecha y hora de certificacion:</span> {{ seals.fecha_timbrado }}</div>
+            <div><span class="k">No. de serie del certificado:</span> {{ seals.no_cert_sat }}</div>
+          </div>
         </td>
       </tr>
     </table>
@@ -597,6 +604,13 @@ ARROSA_SALES_INVOICE_CSS = """
   padding: 4px 6px;
   border: 1px solid #ddd;
   word-break: break-all;
+}
+.arrosa-invoice .cert-meta {
+  margin-top: 6px;
+  font-size: 9px;
+}
+.arrosa-invoice .cert-meta > div {
+  margin: 1px 0;
 }
 """.strip()
 
